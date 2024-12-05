@@ -1,36 +1,39 @@
 package gitlet;
 
-public class TreeEntry {
-    private final String mode;
-    private final String name;
-    private final String type;
-    private final String hash;
+import java.io.Serializable;
 
-    public TreeEntry(String mode, String name, String type, String hash) {
-        this.mode = mode;
-        this.name = name;
-        this.type = type;
+public class TreeEntry implements Serializable {
+    private String path;
+    private String hash;
+
+    public TreeEntry()
+    {
+        this.path = null;
+        this.hash = null;
+    }
+
+    public TreeEntry(String path, String hash) {
+        this.path = path;
         this.hash = hash;
     }
 
-    public String getMode() {
-        return this.mode;
+    public void setPath(String path) {
+        this.path = path;
     }
 
-    public String getName() {
-        return this.name;
+    public String getPath() {
+        return this.path;
     }
 
-    public String getType() {
-        return this.type;
+    public void setHash(String hash) {
+        this.hash = hash;
     }
 
     public String getHash() {
         return this.hash;
     }
 
-    public String getSize()
-    {
-        return String.valueOf(this.mode.length() + this.name.length() + this.type.length() + this.hash.length());
+    public long getSize(){
+        return this.path.length() + this.hash.length();
     }
 }

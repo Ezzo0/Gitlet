@@ -2,6 +2,10 @@ package gitlet;
 
 import java.io.Serializable;
 import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 /** Represents a gitlet commit object.
  *  TODO: It's a good idea to give a description here of what else this Class
@@ -28,9 +32,23 @@ public class Commit implements Serializable {
     /** The parent of this Commit. */
     private String parent;
     /** The timeStamp of this Commit. */
-    private long timeStamp;
+    private String timeStamp;
     /** The tree structure of this Commit. */
-    private Tree tree;
+    private String tree;
+
+    private String setDefaultTimeStamp()
+    {
+        // Create a ZonedDateTime for the epoch time (1970-01-01T00:00:00Z)
+        ZonedDateTime epochTime = ZonedDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC);
+
+        // Define the desired format
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(
+                "HH:mm:ss 'UTC', EEEE, d MMMM yyyy", Locale.ENGLISH
+        );
+
+        // Format the epoch time
+        return epochTime.format(formatter);
+    }
 
     public Commit(String message)
     {
@@ -38,11 +56,7 @@ public class Commit implements Serializable {
         this.branch = "master";
         this.parent = null;
         this.tree = null;
-
-        // Representing 00:00:00 UTC, 1 January 1970
-        Instant epoch = Instant.EPOCH;
-        /// Convert the Instant to seconds since the epoch
-        this.timeStamp = epoch.getEpochSecond();
+        this.timeStamp = setDefaultTimeStamp();
     }
 
     public void setMessage(String message)
@@ -80,25 +94,41 @@ public class Commit implements Serializable {
         return this.parent;
     }
 
-    public void setTimeStamp(long timeStamp)
+    public void setTimeStamp(String timeStamp)
     {
         this.timeStamp = timeStamp;
     }
 
-    public long getTimeStamp()
+    public String getTimeStamp()
     {
         return this.timeStamp;
     }
 
-    public void setTree(Tree tree)
+    public void setTree(String tree)
     {
         this.tree = tree;
     }
 
-    public Tree getTree()
+    public String getTree()
     {
         return this.tree;
     }
 
+    // Method to compute the SHA-1 hash of a tree object
+    public String hashCommitObject() throws IllegalArgumentException
+    {
+        // Serialize the commit content
+        StringBuilder commitContent = new StringBuilder();
+        commitContent.append("Commit\0 ");
+        if (this.tree != null) {
+            commitContent.append("Tree ").append(this.tree).append("\n");
+        }
+        if (this.parent != null) {
+            commitContent.append("Parent ").append(this.parent).append("\n");
+        }
+        commitContent.append("TimeStamp ").append(this.timeStamp).append(" +0000").append("\n");
+        commitContent.append(this.message).append("\n");
+        return Utils.sha1(commitContent.toString());
+    }
 
 }
