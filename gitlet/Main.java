@@ -138,6 +138,11 @@ public class Main {
                 Repository.rm(args[1]);
                 break;
 
+            case "log":
+                if (!validateNumArgs(args, 1)) break;
+                Repository.log();
+                break;
+
             default:
                 Utils.message("No command with that name exists.");
                 checker(3);

@@ -5,7 +5,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
 
 /** Represents a gitlet repository.
  *  TODO: It's a good idea to give a description here of what else this Class
@@ -275,5 +274,42 @@ public class Repository {
 
         // File is neither Staged nor Tracked by the HEAD Commit
         Utils.message("No reason to remove the file.");
+    }
+
+    /** TODO:For merge commits (those that have two parent commits), add a line just below the first, as in
+     * ===
+     * commit 3e8bf1d794ca2e9ef8a4007275acf3751c7170ff
+     * Merge: 4975af1 2c1ead1
+     * Date: Sat Nov 11 12:30:00 2017 -0800
+     * Merged development into master.
+     *
+     * where the two hexadecimal numerals following “Merge:” consist of the first seven digits of the first and second parents’ commit ids, in that order.
+     * The first parent is the branch you were on when you did the merge; the second is that of the merged-in branch.
+     * */
+
+    public static void log()
+    {
+        if (HEAD.exists())
+        {
+            String SHA = Utils.readContentsAsString(HEAD);
+            File commitSHA1 = Utils.join(OBJs, SHA);
+            try {
+                Commit currentCommit = Utils.readObject(commitSHA1, Commit.class);
+                while (true)
+                {
+                    System.out.println("Commit " + SHA);
+                    System.out.println("Date: " + currentCommit.getTimeStamp());
+                    Utils.message(currentCommit.getMessage());
+                    System.out.println();
+                    Utils.message("===");
+                    SHA = currentCommit.getParent();
+                    if (SHA == null) break;
+                    commitSHA1 = Utils.join(OBJs, SHA);
+                    currentCommit = Utils.readObject(commitSHA1, Commit.class);
+                }
+            } catch (IllegalArgumentException e) {
+                System.out.println("Log Error: " + e.getMessage());
+            }
+        }
     }
 }

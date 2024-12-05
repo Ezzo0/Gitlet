@@ -29,8 +29,10 @@ public class Commit implements Serializable {
     private String message;
     /** The branch of this Commit. */
     private String branch;
-    /** The parent of this Commit. */
+    /** The first parent of this Commit. */
     private String parent;
+    /** The second parent of this Commit. */
+    private String secParent;
     /** The timeStamp of this Commit. */
     private String timeStamp;
     /** The tree structure of this Commit. */
@@ -55,6 +57,7 @@ public class Commit implements Serializable {
         this.message = message;
         this.branch = "master";
         this.parent = null;
+        this.secParent = null;
         this.tree = null;
         this.timeStamp = setDefaultTimeStamp();
     }
