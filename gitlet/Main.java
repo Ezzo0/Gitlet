@@ -33,13 +33,13 @@ public class Main {
         }
         /**************************************** Testing commit method ****************************************/
         else if (inpt == 2) {
-            File f = Utils.join(Repository.OBJs, "6932eba879e350ca14059bde20a249d5c89be204");
+            File f = Utils.join(Repository.COMMITS, "0500610a590ca43ba6f78cacc6a7dc88d9543a61");
             Commit c = Utils.readObject(f, Commit.class);
             System.out.println("************** Commit details **************");
             System.out.println("Message: " + c.getMessage());
             System.out.println("Tree: " + c.getTree());
             System.out.println("Parent: " + c.getParent());
-            f = Utils.join(Repository.OBJs, "1c51c9a3b2256071bb8ce97819777d8492350a4f");
+            f = Utils.join(Repository.TREES, "e0a5c367d247a6b6abed72b36ee59cf55ba9fe6f");
             Tree t = Utils.readObject(f, Tree.class);
             System.out.println("************** Tree details **************");
             for (TreeEntry e: t.getTree().values()) {
@@ -47,18 +47,18 @@ public class Main {
                 System.out.println("Hash: " + e.getHash());
             }
             System.out.println("************** Blob details **************");
-            f = Utils.join(Repository.OBJs, "303ec5505566359202d6042059e8eaa92f1b2783");
+            f = Utils.join(Repository.BLOBS, "4d049b8e5d6a72c315854c2b29528f205d894de4");
             Blob b = Utils.readObject(f, Blob.class);
             System.out.println("Content: " + b.getContent());
 
 
-            f = Utils.join(Repository.OBJs, "5a9c3c2e79b184a5b0f313aa7df578704e687af6");
+            f = Utils.join(Repository.COMMITS, "c7bda6817dc253125dd087af21a85eafebf991b0");
             c = Utils.readObject(f, Commit.class);
             System.out.println("************** Commit details **************");
             System.out.println("Message: " + c.getMessage());
             System.out.println("Tree: " + c.getTree());
             System.out.println("Parent: " + c.getParent());
-            f = Utils.join(Repository.OBJs, "d263dfdc0da07694768f4fcf6e272d8aecdd9e84");
+            f = Utils.join(Repository.TREES, "8783b38508018b391a99e0e2f19efb47bad35762");
             t = Utils.readObject(f, Tree.class);
             System.out.println("************** Tree details **************");
             for (TreeEntry e: t.getTree().values()) {
@@ -66,7 +66,7 @@ public class Main {
                 System.out.println("Hash: " + e.getHash());
             }
             System.out.println("************** Blob details **************");
-            f = Utils.join(Repository.OBJs, "c5fb1a437d2a9389b6acc2e482a224195b4b603e");
+            f = Utils.join(Repository.BLOBS, "79f4ca438c8fe12f1b498e5c6aaf95d91bf9a20e");
             b = Utils.readObject(f, Blob.class);
             System.out.println("Content: " + b.getContent());
 
@@ -80,13 +80,13 @@ public class Main {
         }
         /**************************************** Testing rm method ****************************************/
         else if (inpt == 3) {
-            File f = Utils.join(Repository.OBJs, "eb20ac3528dbc904afc225af23e2fdfd9bc67bc4");
+            File f = Utils.join(Repository.COMMITS, "89a157e08b6b4a95e6d38a01cba9dba87bf137f6");
             Commit c = Utils.readObject(f, Commit.class);
             System.out.println("************** Commit details **************");
             System.out.println("Message: " + c.getMessage());
             System.out.println("Tree: " + c.getTree());
             System.out.println("Parent: " + c.getParent());
-            f = Utils.join(Repository.OBJs, "a3b15a1ad4e0c5e7c62c570b06915e4ff62b37e6");
+            f = Utils.join(Repository.TREES, "2101afb583fc140e2bd5ab658b4427bb574ead01");
             Tree t = Utils.readObject(f, Tree.class);
             System.out.println("************** Tree details **************");
             for (TreeEntry e: t.getTree().values()) {
@@ -141,6 +141,10 @@ public class Main {
             case "log":
                 if (!validateNumArgs(args, 1)) break;
                 Repository.log();
+                break;
+            case "global-log":
+                if (!validateNumArgs(args, 1)) break;
+                Repository.global_Log();
                 break;
 
             default:

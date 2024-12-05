@@ -4,6 +4,7 @@ import java.io.File;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 
 /** Represents a gitlet repository.
@@ -18,8 +19,14 @@ public class Repository {
     public static final File CWD = new File(System.getProperty("user.dir"));
     /** The .gitlet directory. */
     public static final File GITLET_DIR = Utils.join(CWD, ".gitlet");
-    /** The .gitlet/objects directory. In which commits and blobs are stored */
+    /** The .gitlet/objects directory. In which commits, trees and blobs are stored */
     public static final File OBJs = Utils.join(GITLET_DIR, "objects");
+    /** The .gitlet/objects/commits directory. In which commits are stored */
+    public static final File COMMITS = Utils.join(OBJs, "commits");
+    /** The .gitlet/objects/trees directory. In which trees are stored */
+    public static final File TREES = Utils.join(OBJs, "trees");
+    /** The .gitlet/objects/blobs directory. In which blobs are stored */
+    public static final File BLOBS = Utils.join(OBJs, "blobs");
     /** The head pointer file */
     public static final File HEAD = Utils.join(GITLET_DIR, "HEAD");
     public static final File INDEX = Utils.join(GITLET_DIR, "index");
@@ -57,12 +64,15 @@ public class Repository {
         // Initialize Gitlet Directories
         GITLET_DIR.mkdir();
         OBJs.mkdir();
+        COMMITS.mkdir();
+        TREES.mkdir();
+        BLOBS.mkdir();
 
         // Define an init commit and save it to hard disk
         Commit initialCommit = new Commit("initial commit");
         try {
             String SHA1 = initialCommit.hashCommitObject();
-            File SHA1Commit = Utils.join(OBJs, SHA1);
+            File SHA1Commit = Utils.join(COMMITS, SHA1);
             Utils.writeObject(SHA1Commit, initialCommit);
             Utils.writeContents(HEAD, SHA1);
         } catch (IllegalArgumentException e){
@@ -152,11 +162,11 @@ public class Repository {
         TreeEntry entry = new TreeEntry();
 
         // Getting previous commit tree and storing it in the current commit tree
-        File f = Utils.join(OBJs, previousCommit);
+        File f = Utils.join(COMMITS, previousCommit);
         Commit parent = Utils.readObject(f, Commit.class);
         if (parent.getParent() != null)
         {
-            File t = Utils.join(OBJs, parent.getTree());
+            File t = Utils.join(TREES, parent.getTree());
             Tree parentTree = Utils.readObject(t, Tree.class);
             for (TreeEntry element : parentTree.getTree().values())
                 commitTree.addBlob(element.getPath(), element);
@@ -178,21 +188,21 @@ public class Repository {
 
             // Writing blobs files to hard disk
             String SHA1 = e.getValue().getBlob().getHash();
-            File SHA1Blob = Utils.join(OBJs, SHA1);
+            File SHA1Blob = Utils.join(BLOBS, SHA1);
             Utils.writeObject(SHA1Blob, e.getValue().getBlob());
             System.out.println("Blob Hash: " + SHA1);
         }
 
         // Writing Tree as a file
         String treeSHA1 = commitTree.hashTreeObject();
-        File treeFile = Utils.join(OBJs, treeSHA1);
+        File treeFile = Utils.join(TREES, treeSHA1);
         Utils.writeObject(treeFile, commitTree);
         commit.setTree(treeSHA1);
         System.out.println("Tree Hash: " + treeSHA1);
 
         // Writing Commit as a file
         String SHA1 = commit.hashCommitObject();
-        File SHA1Commit = Utils.join(OBJs, SHA1);
+        File SHA1Commit = Utils.join(COMMITS, SHA1);
         Utils.writeObject(SHA1Commit, commit);
         Utils.writeContents(HEAD, SHA1);
         System.out.println("Commit Hash: " + SHA1);
@@ -236,9 +246,9 @@ public class Repository {
 
         try {
             // Get Tree
-            File head = Utils.join(OBJs, Utils.readContentsAsString(HEAD));
+            File head = Utils.join(COMMITS, Utils.readContentsAsString(HEAD));
             Commit c = Utils.readObject(head, Commit.class);
-            File treePath = Utils.join(OBJs, c.getTree());
+            File treePath = Utils.join(TREES, c.getTree());
             Tree tree = Utils.readObject(treePath, Tree.class);
             HashMap<String, TreeEntry> treeMap = tree.getTree();
 
@@ -292,7 +302,7 @@ public class Repository {
         if (HEAD.exists())
         {
             String SHA = Utils.readContentsAsString(HEAD);
-            File commitSHA1 = Utils.join(OBJs, SHA);
+            File commitSHA1 = Utils.join(COMMITS, SHA);
             try {
                 Commit currentCommit = Utils.readObject(commitSHA1, Commit.class);
                 while (true)
@@ -304,11 +314,31 @@ public class Repository {
                     Utils.message("===");
                     SHA = currentCommit.getParent();
                     if (SHA == null) break;
-                    commitSHA1 = Utils.join(OBJs, SHA);
+                    commitSHA1 = Utils.join(COMMITS, SHA);
                     currentCommit = Utils.readObject(commitSHA1, Commit.class);
                 }
             } catch (IllegalArgumentException e) {
                 System.out.println("Log Error: " + e.getMessage());
+            }
+        }
+    }
+
+    public static void global_Log()
+    {
+        if (COMMITS.exists())
+        {
+            List<String> l = Utils.plainFilenamesIn(COMMITS);
+            if (l != null) {
+                for (String SHA: l)
+                {
+                    File commitSHA1 = Utils.join(COMMITS, SHA);
+                    Commit currentCommit = Utils.readObject(commitSHA1, Commit.class);
+                    System.out.println("Commit " + SHA);
+                    System.out.println("Date: " + currentCommit.getTimeStamp());
+                    Utils.message(currentCommit.getMessage());
+                    System.out.println();
+                    Utils.message("===");
+                }
             }
         }
     }
