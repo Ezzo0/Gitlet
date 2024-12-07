@@ -62,6 +62,16 @@ public class Commit implements Serializable {
         this.timeStamp = setDefaultTimeStamp();
     }
 
+    public Commit(String message, String branch)
+    {
+        this.message = message;
+        this.branch = branch;
+        this.parent = null;
+        this.secParent = null;
+        this.tree = null;
+        this.timeStamp = setDefaultTimeStamp();
+    }
+
     public void setMessage(String message)
     {
         this.message = message;
@@ -128,6 +138,9 @@ public class Commit implements Serializable {
         }
         if (this.parent != null) {
             commitContent.append("Parent ").append(this.parent).append("\n");
+        }
+        if (this.secParent != null) {
+            commitContent.append("Second parent ").append(this.secParent).append("\n");
         }
         commitContent.append("TimeStamp ").append(this.timeStamp).append(" +0000").append("\n");
         commitContent.append(this.message).append("\n");

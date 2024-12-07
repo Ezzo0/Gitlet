@@ -24,7 +24,6 @@ public class Tree implements Serializable {
 
         blobs.put(path, new TreeEntry(blob.getPath(), blob.getHash()));
         this.treeSize += blob.getSize();
-        System.out.println("Current size: " + this.treeSize);
     }
 
     public void removeBlob(String path)
@@ -36,6 +35,8 @@ public class Tree implements Serializable {
     {
         return this.blobs;
     }
+
+
 
     // Method to compute the SHA-1 hash of a tree object
     public String hashTreeObject() throws IllegalArgumentException

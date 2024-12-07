@@ -58,10 +58,16 @@ public class StagingArea implements Serializable {
     }
 
     public void displayStagedFiles() {
-        Utils.message("Staged Files:");
         for (HashMap.Entry<String, StagedFile> entry : this.stage.entrySet()) {
-            Utils.message("File: " + entry.getKey() + " -> Blob Hash: " + entry.getValue().getBlob().getHash());
-            Utils.message("Content: " + entry.getValue().getBlob().getContent());
+            if (entry.getValue() != null)
+                Utils.message(entry.getKey());
+        }
+    }
+
+    public void displayRemovedFiles() {
+        for (HashMap.Entry<String, StagedFile> entry : this.stage.entrySet()) {
+            if (entry.getValue() == null)
+                Utils.message(entry.getKey());
         }
     }
 }

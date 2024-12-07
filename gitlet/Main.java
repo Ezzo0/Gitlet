@@ -23,6 +23,69 @@ public class Main {
         return true;
     }
 
+    private static void testingCommitMethod()
+    {
+        File f = Utils.join(Repository.COMMITS, "14412c3145b54ba0245f610603a410c8619317f8");
+        Commit c = Utils.readObject(f, Commit.class);
+        System.out.println("************** Commit details **************");
+        System.out.println("Message: " + c.getMessage());
+        System.out.println("Tree: " + c.getTree());
+        System.out.println("Parent: " + c.getParent());
+        f = Utils.join(Repository.TREES, "74f505bcc47628e9752ed95ad17d66b881445a65");
+        Tree t = Utils.readObject(f, Tree.class);
+        System.out.println("************** Tree details **************");
+        for (TreeEntry e: t.getTree().values()) {
+            System.out.println("Path: " + e.getPath());
+            System.out.println("Hash: " + e.getHash());
+        }
+        System.out.println("************** Blob details **************");
+        f = Utils.join(Repository.BLOBS, "6380979c8b7cc0f35e8d29dde473ed15c97fe8eb");
+        Blob b = Utils.readObject(f, Blob.class);
+        System.out.println("Content: " + b.getContent());
+
+        System.out.println("************** Staging Area details **************");
+        StagingArea sa = Utils.readObject(Repository.INDEX, StagingArea.class);
+        if (!sa.iscleared()) {
+            for (HashMap.Entry<String, StagedFile> entry : sa.getStagedFiles().entrySet()) {
+                if (entry.getValue() != null)
+                {
+                    Utils.message("File: " + entry.getKey() + " -> Blob Hash: " + entry.getValue().getBlob().getHash());
+                    Utils.message("Content: " + entry.getValue().getBlob().getContent());
+                }
+            }
+        }
+        else
+            Utils.message("Staging Area is cleared");
+    }
+
+    private static void testing_rm_Method()
+    {
+        File f = Utils.join(Repository.COMMITS, "14412c3145b54ba0245f610603a410c8619317f8");
+        Commit c = Utils.readObject(f, Commit.class);
+        System.out.println("************** Commit details **************");
+        System.out.println("Message: " + c.getMessage());
+        System.out.println("Tree: " + c.getTree());
+        System.out.println("Parent: " + c.getParent());
+        f = Utils.join(Repository.TREES, "74f505bcc47628e9752ed95ad17d66b881445a65");
+        Tree t = Utils.readObject(f, Tree.class);
+        System.out.println("************** Tree details **************");
+        for (TreeEntry e: t.getTree().values()) {
+            System.out.println("Path: " + e.getPath());
+            System.out.println("Hash: " + e.getHash());
+        }
+
+        System.out.println("************** Staging Area details **************");
+        StagingArea sa = Utils.readObject(Repository.INDEX, StagingArea.class);
+        if (!sa.iscleared())
+        {
+            for (HashMap.Entry<String, StagedFile> entry : sa.getStagedFiles().entrySet()) {
+                Utils.message("File: " + entry.getKey() + " -> Blob Hash: " + entry.getValue());
+            }
+        }
+        else
+            Utils.message("Staging Area is cleared");
+    }
+
     private static void checker(int inpt)
     {
         /**************************************** Testing add method and staging area ****************************************/
@@ -33,77 +96,11 @@ public class Main {
         }
         /**************************************** Testing commit method ****************************************/
         else if (inpt == 2) {
-            File f = Utils.join(Repository.COMMITS, "0500610a590ca43ba6f78cacc6a7dc88d9543a61");
-            Commit c = Utils.readObject(f, Commit.class);
-            System.out.println("************** Commit details **************");
-            System.out.println("Message: " + c.getMessage());
-            System.out.println("Tree: " + c.getTree());
-            System.out.println("Parent: " + c.getParent());
-            f = Utils.join(Repository.TREES, "e0a5c367d247a6b6abed72b36ee59cf55ba9fe6f");
-            Tree t = Utils.readObject(f, Tree.class);
-            System.out.println("************** Tree details **************");
-            for (TreeEntry e: t.getTree().values()) {
-                System.out.println("Path: " + e.getPath());
-                System.out.println("Hash: " + e.getHash());
-            }
-            System.out.println("************** Blob details **************");
-            f = Utils.join(Repository.BLOBS, "4d049b8e5d6a72c315854c2b29528f205d894de4");
-            Blob b = Utils.readObject(f, Blob.class);
-            System.out.println("Content: " + b.getContent());
-
-
-            f = Utils.join(Repository.COMMITS, "c7bda6817dc253125dd087af21a85eafebf991b0");
-            c = Utils.readObject(f, Commit.class);
-            System.out.println("************** Commit details **************");
-            System.out.println("Message: " + c.getMessage());
-            System.out.println("Tree: " + c.getTree());
-            System.out.println("Parent: " + c.getParent());
-            f = Utils.join(Repository.TREES, "8783b38508018b391a99e0e2f19efb47bad35762");
-            t = Utils.readObject(f, Tree.class);
-            System.out.println("************** Tree details **************");
-            for (TreeEntry e: t.getTree().values()) {
-                System.out.println("Path: " + e.getPath());
-                System.out.println("Hash: " + e.getHash());
-            }
-            System.out.println("************** Blob details **************");
-            f = Utils.join(Repository.BLOBS, "79f4ca438c8fe12f1b498e5c6aaf95d91bf9a20e");
-            b = Utils.readObject(f, Blob.class);
-            System.out.println("Content: " + b.getContent());
-
-            System.out.println("************** Staging Area details **************");
-            StagingArea sa = Utils.readObject(Repository.INDEX, StagingArea.class);
-            if (!sa.iscleared())
-                sa.displayStagedFiles();
-            else
-                Utils.message("Staging Area is cleared");
-
+            testingCommitMethod();
         }
         /**************************************** Testing rm method ****************************************/
         else if (inpt == 3) {
-            File f = Utils.join(Repository.COMMITS, "89a157e08b6b4a95e6d38a01cba9dba87bf137f6");
-            Commit c = Utils.readObject(f, Commit.class);
-            System.out.println("************** Commit details **************");
-            System.out.println("Message: " + c.getMessage());
-            System.out.println("Tree: " + c.getTree());
-            System.out.println("Parent: " + c.getParent());
-            f = Utils.join(Repository.TREES, "2101afb583fc140e2bd5ab658b4427bb574ead01");
-            Tree t = Utils.readObject(f, Tree.class);
-            System.out.println("************** Tree details **************");
-            for (TreeEntry e: t.getTree().values()) {
-                System.out.println("Path: " + e.getPath());
-                System.out.println("Hash: " + e.getHash());
-            }
-
-            System.out.println("************** Staging Area details **************");
-            StagingArea sa = Utils.readObject(Repository.INDEX, StagingArea.class);
-            if (!sa.iscleared())
-            {
-                for (HashMap.Entry<String, StagedFile> entry : sa.getStagedFiles().entrySet()) {
-                    Utils.message("File: " + entry.getKey() + " -> Blob Hash: " + entry.getValue());
-                }
-            }
-            else
-                Utils.message("Staging Area is cleared");
+            testing_rm_Method();
         }
     }
 
@@ -146,10 +143,18 @@ public class Main {
                 if (!validateNumArgs(args, 1)) break;
                 Repository.global_Log();
                 break;
+            case "find":
+                if (!validateNumArgs(args, 2)) break;
+                Repository.find(args[1]);
+                break;
+            case "status":
+                if (!validateNumArgs(args, 1)) break;
+                Repository.status();
+                break;
 
             default:
                 Utils.message("No command with that name exists.");
-                checker(3);
+                checker(2);
         }
     }
 }

@@ -1,11 +1,10 @@
 package gitlet;
 
 import java.io.File;
+import java.rmi.server.UID;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 /** Represents a gitlet repository.
  *  TODO: It's a good idea to give a description here of what else this Class
@@ -29,7 +28,10 @@ public class Repository {
     public static final File BLOBS = Utils.join(OBJs, "blobs");
     /** The head pointer file */
     public static final File HEAD = Utils.join(GITLET_DIR, "HEAD");
+    /** Staging Area file */
     public static final File INDEX = Utils.join(GITLET_DIR, "index");
+    /** The head pointer file */
+    public static final File BRANCH = Utils.join(GITLET_DIR, "branches");
     private static StagingArea st;
 
 
@@ -67,14 +69,20 @@ public class Repository {
         COMMITS.mkdir();
         TREES.mkdir();
         BLOBS.mkdir();
+        BRANCH.mkdir();
 
         // Define an init commit and save it to hard disk
         Commit initialCommit = new Commit("initial commit");
         try {
+            // Writing Commit as object file
             String SHA1 = initialCommit.hashCommitObject();
             File SHA1Commit = Utils.join(COMMITS, SHA1);
             Utils.writeObject(SHA1Commit, initialCommit);
-            Utils.writeContents(HEAD, SHA1);
+
+            // Writing head and branch files
+            File branchFile = Utils.join(BRANCH, initialCommit.getBranch());
+            Utils.writeContents(HEAD, initialCommit.getBranch());
+            Utils.writeContents(branchFile, SHA1);
         } catch (IllegalArgumentException e){
             Utils.message("An error occurred, please DELETE .gitlet directory and try again!");
         }
@@ -109,8 +117,6 @@ public class Repository {
 
         try {
             st.addFile(filePath);
-            if (st != null)
-                st.displayStagedFiles();
             Utils.writeObject(INDEX, st);
         } catch (Exception e) {
             System.out.println("Exception err: " + e);
@@ -130,9 +136,12 @@ public class Repository {
 
         Commit commit = new Commit(message);
 
-        // Fetch the previous commit and update the current commit parent
-        String previousCommit = Utils.readContentsAsString(HEAD);
+        // Fetch the previous commit and update the current commit parent and branch
+        String branch = Utils.readContentsAsString(HEAD);
+        File head = Utils.join(BRANCH, branch);
+        String previousCommit = Utils.readContentsAsString(head);
         commit.setParent(previousCommit);
+        commit.setBranch(branch);
 
         // Get current date and time in UTC and Define the format
         ZonedDateTime now = ZonedDateTime.now(java.time.ZoneOffset.UTC);
@@ -204,7 +213,11 @@ public class Repository {
         String SHA1 = commit.hashCommitObject();
         File SHA1Commit = Utils.join(COMMITS, SHA1);
         Utils.writeObject(SHA1Commit, commit);
-        Utils.writeContents(HEAD, SHA1);
+
+        // Updating head and branch files
+        File branchFile = Utils.join(BRANCH, commit.getBranch());
+        Utils.writeContents(HEAD, commit.getBranch());
+        Utils.writeContents(branchFile, SHA1);
         System.out.println("Commit Hash: " + SHA1);
 
         // Clear Staging Area
@@ -246,8 +259,13 @@ public class Repository {
 
         try {
             // Get Tree
-            File head = Utils.join(COMMITS, Utils.readContentsAsString(HEAD));
+            String currentBranch = Utils.readContentsAsString(HEAD);
+            File branch = Utils.join(BRANCH, currentBranch);
+            String commitHash = Utils.readContentsAsString(branch);
+
+            File head = Utils.join(COMMITS, commitHash);
             Commit c = Utils.readObject(head, Commit.class);
+
             File treePath = Utils.join(TREES, c.getTree());
             Tree tree = Utils.readObject(treePath, Tree.class);
             HashMap<String, TreeEntry> treeMap = tree.getTree();
@@ -286,7 +304,7 @@ public class Repository {
         Utils.message("No reason to remove the file.");
     }
 
-    /** TODO:For merge commits (those that have two parent commits), add a line just below the first, as in
+    /** TODO: For merge commits (those that have two parent commits), add a line just below the first, as in
      * ===
      * commit 3e8bf1d794ca2e9ef8a4007275acf3751c7170ff
      * Merge: 4975af1 2c1ead1
@@ -299,9 +317,15 @@ public class Repository {
 
     public static void log()
     {
+        // Check the existence of .gitlet Directory
+        if (!initializedGitlet())
+            return;
+
         if (HEAD.exists())
         {
-            String SHA = Utils.readContentsAsString(HEAD);
+            String currentBranch = Utils.readContentsAsString(HEAD);
+            File branch = Utils.join(BRANCH, currentBranch);
+            String SHA = Utils.readContentsAsString(branch);
             File commitSHA1 = Utils.join(COMMITS, SHA);
             try {
                 Commit currentCommit = Utils.readObject(commitSHA1, Commit.class);
@@ -313,6 +337,7 @@ public class Repository {
                     System.out.println();
                     Utils.message("===");
                     SHA = currentCommit.getParent();
+
                     if (SHA == null) break;
                     commitSHA1 = Utils.join(COMMITS, SHA);
                     currentCommit = Utils.readObject(commitSHA1, Commit.class);
@@ -325,6 +350,10 @@ public class Repository {
 
     public static void global_Log()
     {
+        // Check the existence of .gitlet Directory
+        if (!initializedGitlet())
+            return;
+
         if (COMMITS.exists())
         {
             List<String> l = Utils.plainFilenamesIn(COMMITS);
@@ -341,5 +370,215 @@ public class Repository {
                 }
             }
         }
+    }
+
+    public static void find(String message)
+    {
+        // Check the existence of .gitlet Directory
+        if (!initializedGitlet())
+            return;
+
+        if (COMMITS.exists())
+        {
+            List<String> l = Utils.plainFilenamesIn(COMMITS);
+            if (l != null) {
+                for (String SHA: l)
+                {
+                    File commitSHA1 = Utils.join(COMMITS, SHA);
+                    Commit currentCommit = Utils.readObject(commitSHA1, Commit.class);
+                    String commitMessage = currentCommit.getMessage();
+                    if (message.equals(commitMessage))
+                        Utils.message(SHA);
+                }
+            }
+        }
+    }
+
+    private static Map<String, String> Tracked()
+    {
+        Map<String, String> map = new TreeMap<>();
+        // Fetching the current commit
+        String branch = Utils.readContentsAsString(HEAD);
+        File head = Utils.join(BRANCH, branch);
+        String commitHash = Utils.readContentsAsString(head);
+        head = Utils.join(COMMITS, commitHash);
+        Commit currentCommit = Utils.readObject(head, Commit.class);
+
+        // Fetching the tree of the current commit
+        String t = currentCommit.getTree();
+        File treeHash = null;
+        Tree tree = null;
+        if (t != null) {
+            treeHash = Utils.join(TREES, t);
+            tree = Utils.readObject(treeHash, Tree.class);
+        }
+
+        // If current commit is the init commit, we need to create index object(as index object is created with add method)
+        try {
+            st = Utils.readObject(INDEX, StagingArea.class);
+        } catch (IllegalArgumentException e) {
+            st = new StagingArea();
+        }
+        HashMap<String, StagedFile> stagedFiles = st.getStagedFiles();
+
+        List<String> l = Utils.plainFilenamesIn(CWD);
+        Map<String, String> workingFiles = new HashMap<>();
+        if (l != null) {
+            // Modified Files
+            for (String s: l)
+            {
+                File f = new File(s);
+                Blob currentBlob = new Blob(f);
+                workingFiles.put(s, currentBlob.getHash());
+                TreeEntry entry = null;
+                if (tree != null)
+                    entry = tree.getTree().get(s);
+
+                // Tracked in the current commit?
+                if (tree != null && tree.getTree().containsKey(s)) {
+                    // Changed in the working directory?
+                    if ( !entry.getHash().equals( currentBlob.getHash() ) ) {
+                        // Staged?
+                        if (!st.iscleared() && stagedFiles.containsKey(s)) {
+                            // Different content?
+                            if ( !stagedFiles.get(s).getBlob().getHash().equals( currentBlob.getHash() ) )
+                                map.put(s, "(modified)");
+                        }
+                        else
+                            map.put(s, "(modified)");
+                    }
+                    else {
+                        // Staged?
+                        if (!st.iscleared() && stagedFiles.containsKey(s)) {
+                            // Removed with rm command and exist in WD without gitlet knowledge.
+                            if ( stagedFiles.get(s) == null )
+                                map.put(s, "Untracked");
+                        }
+                    }
+                }
+                else {
+                    if (st.iscleared()) {
+                        map.put(s, "Untracked");
+                    }
+                    else {
+                        // Staged?
+                        if (stagedFiles.containsKey(s)) {
+                            // Staged for removal, but then re-created without Gitlet’s knowledge.
+                            if (stagedFiles.get(s).getBlob() == null) {
+                                map.put(s, "Untracked");
+                            }
+                            else {
+                                // Different content?
+                                if ( !stagedFiles.get(s).getBlob().getHash().equals( currentBlob.getHash() ) )
+                                    map.put(s, "(modified)");
+                            }
+                        }
+                        else
+                            map.put(s, "Untracked");
+                    }
+                }
+            }
+
+            if (!st.iscleared()) {
+                // Staged for addition, but deleted in the working directory.
+                for (HashMap.Entry<String, StagedFile> entry : stagedFiles.entrySet()) {
+                    if (entry.getValue() != null)
+                        if ( !workingFiles.containsKey( entry.getKey() ) )
+                            map.put(entry.getKey(), "(deleted)");
+                }
+            }
+
+            if (tree != null) {
+                // Not staged for removal, but tracked in the current commit and deleted from the working directory.
+                for (HashMap.Entry<String, TreeEntry> entry : tree.getTree().entrySet()) {
+                    if ( !workingFiles.containsKey( entry.getKey() ) && ( st.iscleared() || !stagedFiles.containsKey( entry.getKey() ) ) )
+                        map.put(entry.getKey(), "(deleted)");
+                }
+            }
+        }
+        return map;
+    }
+
+
+    public static void status()
+    {
+        // Check the existence of .gitlet Directory
+        if (!initializedGitlet())
+            return;
+
+        // Fetching branches' names
+        if (BRANCH.exists() && HEAD.exists())
+        {
+            List<String> l = Utils.plainFilenamesIn(BRANCH);
+            String currentBranch = Utils.readContentsAsString(HEAD);
+            if (l != null) {
+                Utils.message("=== Branches ===");
+                for (String branch: l) {
+                    if (branch.equals(currentBranch)) System.out.print("*");
+                    Utils.message(branch);
+                }
+                System.out.println();
+            }
+        }
+        else {
+            Utils.message("Unknown Error!!!");
+            return;
+        }
+
+        Map<String, String> stage = new TreeMap<>();
+        // Fetching staging area
+        if (INDEX.exists())
+        {
+            st = Utils.readObject(Repository.INDEX, StagingArea.class);
+            if (!st.iscleared()) {
+                for (HashMap.Entry<String, StagedFile> entry : st.getStagedFiles().entrySet()) {
+                    if (entry.getValue() != null)
+                        stage.put(entry.getKey(), "Staged");
+                    else
+                        stage.put(entry.getKey(), "Removed");
+                }
+            }
+        }
+
+        Map <String, String> m = Tracked();
+        Iterator<Map.Entry<String, String>> iterator = stage.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, String> entry = iterator.next();
+            if (m.containsKey(entry.getKey())) {
+                iterator.remove(); // Safe removal
+            }
+        }
+
+        Utils.message("=== Staged Files ===");
+        for (Map.Entry<String, String> entry : stage.entrySet())
+            if (entry.getValue().equals("Staged"))
+                Utils.message(entry.getKey());
+        System.out.println();
+
+        Utils.message("=== Removed Files ===");
+        for (Map.Entry<String, String> entry : stage.entrySet())
+            if (entry.getValue().equals("Removed"))
+                Utils.message(entry.getKey());
+        System.out.println();
+
+        /// Modified but not staged for commit
+        Utils.message("=== Modifications Not Staged For Commit ===");
+        /*
+          Tracked in the current commit, changed in the working directory, but not staged; or (done)
+          Staged for addition, but with different contents than in the working directory; or (done)
+          Staged for addition, but deleted in the working directory; or (done)
+          Not staged for removal, but tracked in the current commit and deleted from the working directory. (done)
+          */
+        for (Map.Entry<String, String> entry : m.entrySet())
+            if (!entry.getValue().equals("Untracked"))
+                Utils.message(entry.getKey() + " " + entry.getValue());
+        System.out.println();
+
+
+        Utils.message("=== Untracked Files ===");
+        for (Map.Entry<String, String> entry : m.entrySet())
+            if (entry.getValue().equals("Untracked"))
+                Utils.message(entry.getKey());
+        System.out.println();
     }
 }
