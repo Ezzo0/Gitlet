@@ -1,7 +1,6 @@
 package gitlet;
 
 import java.io.File;
-import java.rmi.server.UID;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -224,8 +223,7 @@ public class Repository {
         stage.clearStage();
     }
 
-    public static void rm(String filePath)
-    {
+    public static void rm(String filePath) {
         // Check the existence of .gitlet Directory
         if (!initializedGitlet())
             return;
@@ -315,8 +313,7 @@ public class Repository {
      * The first parent is the branch you were on when you did the merge; the second is that of the merged-in branch.
      * */
 
-    public static void log()
-    {
+    public static void log() {
         // Check the existence of .gitlet Directory
         if (!initializedGitlet())
             return;
@@ -348,8 +345,7 @@ public class Repository {
         }
     }
 
-    public static void global_Log()
-    {
+    public static void global_Log() {
         // Check the existence of .gitlet Directory
         if (!initializedGitlet())
             return;
@@ -372,8 +368,7 @@ public class Repository {
         }
     }
 
-    public static void find(String message)
-    {
+    public static void find(String message) {
         // Check the existence of .gitlet Directory
         if (!initializedGitlet())
             return;
@@ -394,8 +389,7 @@ public class Repository {
         }
     }
 
-    private static Map<String, String> Tracked()
-    {
+    private static Map<String, String> Tracked() {
         Map<String, String> map = new TreeMap<>();
         // Fetching the current commit
         String branch = Utils.readContentsAsString(HEAD);
@@ -500,8 +494,7 @@ public class Repository {
     }
 
 
-    public static void status()
-    {
+    public static void status() {
         // Check the existence of .gitlet Directory
         if (!initializedGitlet())
             return;
@@ -580,5 +573,169 @@ public class Repository {
             if (entry.getValue().equals("Untracked"))
                 Utils.message(entry.getKey());
         System.out.println();
+    }
+
+
+    public static void checkout(String[] args) {
+        // Check the existence of .gitlet Directory
+        if (!initializedGitlet())
+            return;
+
+        if (args.length == 3) {
+            /* java gitlet.Main checkout -- [file name] */
+            String fileName = args[2];
+
+            // Fetch the previous commit
+            if (HEAD.exists() && BRANCH.exists()) {
+                try {
+                    String branch = Utils.readContentsAsString(HEAD);
+                    File head = Utils.join(BRANCH, branch);
+                    String previousCommit = Utils.readContentsAsString(head);
+
+                    File commitSHA = Utils.join(COMMITS, previousCommit);
+                    Commit c = Utils.readObject(commitSHA, Commit.class);
+                    String commitTree = c.getTree();
+                    File treeSHA = Utils.join(TREES, commitTree);
+                    Tree tree = Utils.readObject(treeSHA, Tree.class);
+                    if (tree.getTree().containsKey(fileName)) {
+                        // Remove the file from staging area if it is staged
+                        st = Utils.readObject(INDEX, StagingArea.class);
+                        if (!st.iscleared())
+                            st.removeFile(fileName);
+
+                        // Fetching the content
+                        String blobHash = tree.getTree().get(fileName).getHash();
+                        File f = Utils.join(BLOBS, blobHash);
+                        Blob blob = Utils.readObject(f, Blob.class);
+                        String content = blob.getContent();
+
+                        // Overwriting content
+                        try {
+                            File path = Utils.join(CWD, fileName);
+                            Utils.writeContents(path, content);
+                        } catch (IllegalArgumentException e) {
+                            Utils.message("Unknown Error!!!");
+                        }
+                    } else {
+                        Utils.message("File does not exist in that commit.");
+                    }
+                } catch (Exception e) {
+                    Utils.message("File does not exist in that commit.");
+                }
+            } else {
+                Utils.message("File does not exist in that commit.");
+                return;
+            }
+        } else if (args.length == 4) {
+            /* java gitlet.Main checkout [commit id] -- [file name] */
+            String commitID = args[1];
+            String fileName = args[3];
+            try {
+                File commitSHA = Utils.join(COMMITS, commitID);
+                Commit c;
+                try {
+                    c = Utils.readObject(commitSHA, Commit.class);
+                } catch (IllegalArgumentException e) {
+                    Utils.message("No commit with that id exists");
+                    return;
+                }
+                String commitTree = c.getTree();
+                File treeSHA = Utils.join(TREES, commitTree);
+                Tree tree = Utils.readObject(treeSHA, Tree.class);
+                if (tree.getTree().containsKey(fileName)) {
+                    // Remove the file from staging area if it is staged
+                    st = Utils.readObject(INDEX, StagingArea.class);
+                    if (!st.iscleared())
+                        st.removeFile(fileName);
+
+                    // Fetching the content
+                    String blobHash = tree.getTree().get(fileName).getHash();
+                    File f = Utils.join(BLOBS, blobHash);
+                    Blob blob = Utils.readObject(f, Blob.class);
+                    String content = blob.getContent();
+
+                    // Overwriting content
+                    try {
+                        File path = Utils.join(CWD, fileName);
+                        Utils.writeContents(path, content);
+                    } catch (IllegalArgumentException e) {
+                        Utils.message("Unknown Error!!!");
+                    }
+
+                } else {
+                    Utils.message("File does not exist in that commit.");
+                }
+            } catch (Exception e) {
+                Utils.message("File does not exist in that commit.");
+            }
+
+        } else {
+            /* java gitlet.Main checkout [branch name] */
+            String branch = args[1];
+            String currentBranch = Utils.readContentsAsString(HEAD);
+            if (branch.equals(currentBranch)) {
+                Utils.message("No need to checkout the current branch.");
+                return;
+            }
+            File head = Utils.join(BRANCH, branch);
+            String previousCommit = null;
+            try {
+                previousCommit = Utils.readContentsAsString(head);
+            } catch (IllegalArgumentException e) {
+                Utils.message("No such branch exists.");
+                return;
+            }
+            File commitSHA = Utils.join(COMMITS, previousCommit);
+            Commit c = Utils.readObject(commitSHA, Commit.class);
+            String commitTree = c.getTree();
+            File treeSHA = Utils.join(TREES, commitTree);
+            Tree tree = Utils.readObject(treeSHA, Tree.class);
+
+            List<String> l = Utils.plainFilenamesIn(CWD);
+
+            Map<String, String> untracked = Tracked();
+            for (String file: l) {
+                // Checking the existence of untracked files
+                if (untracked.containsKey(file) && untracked.get(file).equals("Untracked") ) {
+                    Utils.message("There is an untracked file in the way; delete it, or add and commit it first.");
+                    return;
+                }
+            }
+
+
+            // Deleting tracked files that are not in checked-out branch tree
+            for (String file: l) {
+                if (!tree.getTree().containsKey(file)) {
+                    Utils.restrictedDelete(file);
+                }
+            }
+
+            for (HashMap.Entry<String, TreeEntry> entry : tree.getTree().entrySet()) {
+                if (entry.getValue() != null) {
+                    try {
+                        // Fetching the content
+                        String blobHash = entry.getValue().getHash();
+                        File f = Utils.join(BLOBS, blobHash);
+                        Blob blob = Utils.readObject(f, Blob.class);
+                        String content = blob.getContent();
+
+                        // Overwriting the content
+                        f = Utils.join(CWD, entry.getKey());
+                        Utils.writeContents(f, content);
+
+                    } catch (IllegalArgumentException e) {
+                        Utils.message("Unknown Error !!!");
+                    }
+                }
+            }
+
+            // Changing the current branch (HEAD) to the given branch.
+            Utils.writeContents(HEAD, branch);
+
+            // Clearing Staging Area
+            st = Utils.readObject(INDEX, StagingArea.class);
+            st.clearStage();
+            Utils.writeObject(INDEX, st);
+        }
     }
 }

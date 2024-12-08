@@ -17,7 +17,6 @@ public class Main {
      */
     public static boolean validateNumArgs(String[] args, int n) {
         if (args.length != n) {
-            Utils.message("Incorrect operands.");
             return false;
         }
         return true;
@@ -117,39 +116,70 @@ public class Main {
         String firstArg = args[0];
         switch(firstArg) {
             case "init":
-                if (!validateNumArgs(args, 1))  break;
+                if (!validateNumArgs(args, 1)) {
+                    Utils.message("Incorrect operands.");
+                    break;
+                }
                 Repository.init();
                 break;
 
             case "add":
-                if (!validateNumArgs(args, 2))  break;
+                if (!validateNumArgs(args, 2)) {
+                    Utils.message("Incorrect operands.");
+                    break;
+                }
                 Repository.add(args[1]);
                 break;
 
             case "commit":
-                if (!validateNumArgs(args, 2))  break;
+                if (!validateNumArgs(args, 2)) {
+                    Utils.message("Incorrect operands.");
+                    break;
+                }
                 Repository.commit(args[1]);
                 break;
             case "rm":
-                if (!validateNumArgs(args, 2)) break;
+                if (!validateNumArgs(args, 2)) {
+                    Utils.message("Incorrect operands.");
+                    break;
+                }
                 Repository.rm(args[1]);
                 break;
 
             case "log":
-                if (!validateNumArgs(args, 1)) break;
+                if (!validateNumArgs(args, 1)) {
+                    Utils.message("Incorrect operands.");
+                    break;
+                }
                 Repository.log();
                 break;
             case "global-log":
-                if (!validateNumArgs(args, 1)) break;
+                if (!validateNumArgs(args, 1)) {
+                    Utils.message("Incorrect operands.");
+                    break;
+                }
                 Repository.global_Log();
                 break;
             case "find":
-                if (!validateNumArgs(args, 2)) break;
+                if (!validateNumArgs(args, 2)) {
+                    Utils.message("Incorrect operands.");
+                    break;
+                }
                 Repository.find(args[1]);
                 break;
             case "status":
-                if (!validateNumArgs(args, 1)) break;
+                if (!validateNumArgs(args, 1)) {
+                    Utils.message("Incorrect operands.");
+                    break;
+                }
                 Repository.status();
+                break;
+            case "checkout":
+                if (!validateNumArgs(args, 2) && !validateNumArgs(args, 3) && !validateNumArgs(args, 4)) {
+                    Utils.message("Incorrect operands.");
+                    break;
+                }
+                Repository.checkout(args);
                 break;
 
             default:
