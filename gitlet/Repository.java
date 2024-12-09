@@ -1,9 +1,10 @@
 package gitlet;
 
 import java.io.File;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
 
 /** Represents a gitlet repository.
  *  TODO: It's a good idea to give a description here of what else this Class
@@ -142,13 +143,15 @@ public class Repository {
         commit.setParent(previousCommit);
         commit.setBranch(branch);
 
-        // Get current date and time in UTC and Define the format
-        ZonedDateTime now = ZonedDateTime.now(java.time.ZoneOffset.UTC);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(
-                "HH:mm:ss 'UTC', EEEE, d MMMM yyyy", Locale.ENGLISH
-        );
+        // Get the current date and time
+        Date now = new Date();
+        // Create a formatter for the desired format
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z");
+
+        // Set the formatter to use the system's default timezone
+        sdf.setTimeZone(TimeZone.getDefault());
         // Format the current date and time and update Commit Timestamp
-        commit.setTimeStamp(now.format(formatter));
+        commit.setTimeStamp(sdf.format(now));
 
         // Nothing to be committed if Staging Area was cleared
         StagingArea stage;
@@ -198,7 +201,6 @@ public class Repository {
             String SHA1 = e.getValue().getBlob().getHash();
             File SHA1Blob = Utils.join(BLOBS, SHA1);
             Utils.writeObject(SHA1Blob, e.getValue().getBlob());
-            System.out.println("Blob Hash: " + SHA1);
         }
 
         // Writing Tree as a file
@@ -206,7 +208,6 @@ public class Repository {
         File treeFile = Utils.join(TREES, treeSHA1);
         Utils.writeObject(treeFile, commitTree);
         commit.setTree(treeSHA1);
-        System.out.println("Tree Hash: " + treeSHA1);
 
         // Writing Commit as a file
         String SHA1 = commit.hashCommitObject();
@@ -217,7 +218,6 @@ public class Repository {
         File branchFile = Utils.join(BRANCH, commit.getBranch());
         Utils.writeContents(HEAD, commit.getBranch());
         Utils.writeContents(branchFile, SHA1);
-        System.out.println("Commit Hash: " + SHA1);
 
         // Clear Staging Area
         stage.clearStage();
@@ -332,7 +332,8 @@ public class Repository {
                     System.out.println("Date: " + currentCommit.getTimeStamp());
                     Utils.message(currentCommit.getMessage());
                     System.out.println();
-                    Utils.message("===");
+                    if (!currentCommit.getMessage().equals("initial commit"))
+                        Utils.message("===");
                     SHA = currentCommit.getParent();
 
                     if (SHA == null) break;
@@ -595,8 +596,13 @@ public class Repository {
                     File commitSHA = Utils.join(COMMITS, previousCommit);
                     Commit c = Utils.readObject(commitSHA, Commit.class);
                     String commitTree = c.getTree();
-                    File treeSHA = Utils.join(TREES, commitTree);
-                    Tree tree = Utils.readObject(treeSHA, Tree.class);
+                    Tree tree = null;
+                    if (commitTree != null) {
+                        File treeSHA = Utils.join(TREES, commitTree);
+                        tree = Utils.readObject(treeSHA, Tree.class);
+                    } else {
+                        tree = new Tree();
+                    }
                     if (tree.getTree().containsKey(fileName)) {
                         // Remove the file from staging area if it is staged
                         st = Utils.readObject(INDEX, StagingArea.class);
@@ -640,8 +646,13 @@ public class Repository {
                     return;
                 }
                 String commitTree = c.getTree();
-                File treeSHA = Utils.join(TREES, commitTree);
-                Tree tree = Utils.readObject(treeSHA, Tree.class);
+                Tree tree = null;
+                if (commitTree != null) {
+                    File treeSHA = Utils.join(TREES, commitTree);
+                    tree = Utils.readObject(treeSHA, Tree.class);
+                } else {
+                    tree = new Tree();
+                }
                 if (tree.getTree().containsKey(fileName)) {
                     // Remove the file from staging area if it is staged
                     st = Utils.readObject(INDEX, StagingArea.class);
@@ -688,8 +699,13 @@ public class Repository {
             File commitSHA = Utils.join(COMMITS, previousCommit);
             Commit c = Utils.readObject(commitSHA, Commit.class);
             String commitTree = c.getTree();
-            File treeSHA = Utils.join(TREES, commitTree);
-            Tree tree = Utils.readObject(treeSHA, Tree.class);
+            Tree tree = null;
+            if (commitTree != null) {
+                File treeSHA = Utils.join(TREES, commitTree);
+                tree = Utils.readObject(treeSHA, Tree.class);
+            } else {
+                tree = new Tree();
+            }
 
             List<String> l = Utils.plainFilenamesIn(CWD);
 
@@ -759,6 +775,98 @@ public class Repository {
             f = Utils.join(BRANCH, newBranch);
             Utils.writeContents(f, currentCommit);
         } else
-            Utils.message("Unknown Error");
+            Utils.message("Unknown Error !!!");
+    }
+
+    public static void rmBranch(String branch) {
+        // Check the existence of .gitlet Directory
+        if (!initializedGitlet())
+            return;
+
+        if (HEAD.exists()) {
+            String currentBranch = Utils.readContentsAsString(HEAD);
+            if (currentBranch.equals(branch)) {
+                Utils.message("Cannot remove the current branch.");
+                return;
+            }
+
+            File path = Utils.join(BRANCH, branch);
+            if (path.exists()) {
+                if (!path.delete())
+                    Utils.message("Unknown Error !!!");
+            }
+            else
+                Utils.message("A branch with that name does not exist.");
+        } else
+            Utils.message("Unknown Error !!!");
+    }
+
+    public static void reset(String commitID) {
+        // Check the existence of .gitlet Directory
+        if (!initializedGitlet())
+            return;
+
+        File path = Utils.join(COMMITS, commitID);
+        if (!path.exists()) {
+            Utils.message("No commit with that id exists.");
+            return;
+        }
+        Commit commit = Utils.readObject(path, Commit.class);
+        String commitTree = commit.getTree();
+        Tree tree = null;
+        if (commitTree != null) {
+            File treeSHA = Utils.join(TREES, commitTree);
+            tree = Utils.readObject(treeSHA, Tree.class);
+        } else {
+            tree = new Tree();
+        }
+
+        List<String> l = Utils.plainFilenamesIn(CWD);
+
+        Map<String, String> untracked = Tracked();
+        for (String file: l) {
+            // Checking the existence of untracked files
+            if (untracked.containsKey(file) && untracked.get(file).equals("Untracked") ) {
+                Utils.message("There is an untracked file in the way; delete it, or add and commit it first.");
+                return;
+            }
+        }
+
+        // Deleting tracked files that are not in checked-out commit tree
+        for (String file: l) {
+            if (!tree.getTree().containsKey(file)) {
+                Utils.restrictedDelete(file);
+            }
+        }
+
+        for (HashMap.Entry<String, TreeEntry> entry : tree.getTree().entrySet()) {
+            if (entry.getValue() != null) {
+                try {
+                    // Fetching the content
+                    String blobHash = entry.getValue().getHash();
+                    File f = Utils.join(BLOBS, blobHash);
+                    Blob blob = Utils.readObject(f, Blob.class);
+                    String content = blob.getContent();
+
+                    // Overwriting the content
+                    f = Utils.join(CWD, entry.getKey());
+                    Utils.writeContents(f, content);
+
+                } catch (IllegalArgumentException e) {
+                    Utils.message("Unknown Error !!!");
+                }
+            }
+        }
+
+        // Changing the current branch (HEAD) to the given branch.
+        Utils.writeContents(HEAD, commit.getBranch());
+
+        // Clearing Staging Area
+        st = Utils.readObject(INDEX, StagingArea.class);
+        st.clearStage();
+        Utils.writeObject(INDEX, st);
+    }
+    public static void merge(String branch) {
+
     }
 }

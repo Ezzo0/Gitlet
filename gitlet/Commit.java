@@ -1,11 +1,9 @@
 package gitlet;
 
 import java.io.Serializable;
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.util.Locale;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
 
 /** Represents a gitlet commit object.
  *  TODO: It's a good idea to give a description here of what else this Class
@@ -40,16 +38,31 @@ public class Commit implements Serializable {
 
     private String setDefaultTimeStamp()
     {
-        // Create a ZonedDateTime for the epoch time (1970-01-01T00:00:00Z)
-        ZonedDateTime epochTime = ZonedDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC);
+//        // Create a ZonedDateTime for the epoch time (1970-01-01T00:00:00Z)
+//        ZonedDateTime epochTime = ZonedDateTime.ofInstant(Instant.EPOCH, ZoneOffset.UTC);
+//
+//        // Define the desired format
+//        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(
+//                "HH:mm:ss 'UTC', EEEE, d MMMM yyyy", Locale.ENGLISH
+//        );
+//
+//        // Format the epoch time
+//        return epochTime.format(formatter);
 
-        // Define the desired format
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(
-                "HH:mm:ss 'UTC', EEEE, d MMMM yyyy", Locale.ENGLISH
-        );
+        // Define the UTC timestamp: 00:00:00 UTC, Thursday, 1 January 1970
+        long utcTimestamp = 0; // This is the epoch time for 00:00:00 UTC, 1 January 1970
 
-        // Format the epoch time
-        return epochTime.format(formatter);
+        // Create a Date object for the given timestamp
+        Date date = new Date(utcTimestamp);
+
+        // Create a formatter for the desired format
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z");
+
+        // Set the formatter to use your local timezone
+        sdf.setTimeZone(TimeZone.getDefault()); // Or specify your timezone like TimeZone.getTimeZone("Europe/Berlin")
+
+        // Format the date
+        return sdf.format(date);
     }
 
     public Commit(String message)
