@@ -181,6 +181,13 @@ public class Main {
                 }
                 Repository.checkout(args);
                 break;
+            case "branch":
+                if (!validateNumArgs(args, 2)) {
+                    Utils.message("Incorrect operands.");
+                    break;
+                }
+                Repository.branch(args[1]);
+                break;
 
             default:
                 Utils.message("No command with that name exists.");

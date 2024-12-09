@@ -738,4 +738,27 @@ public class Repository {
             Utils.writeObject(INDEX, st);
         }
     }
+
+    public static void branch(String newBranch) {
+        // Check the existence of .gitlet Directory
+        if (!initializedGitlet())
+            return;
+
+        // Check the existance of the branch
+        if (Utils.join(BRANCH, newBranch).exists()) {
+            Utils.message("A branch with that name already exists.");
+            return;
+        }
+
+        // Creating new branch
+        if (HEAD.exists()) {
+            String currentBranch = Utils.readContentsAsString(HEAD);
+            File f = Utils.join(BRANCH, currentBranch);
+            String currentCommit = Utils.readContentsAsString(f);
+
+            f = Utils.join(BRANCH, newBranch);
+            Utils.writeContents(f, currentCommit);
+        } else
+            Utils.message("Unknown Error");
+    }
 }

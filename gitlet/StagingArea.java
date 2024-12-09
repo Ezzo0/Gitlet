@@ -15,6 +15,31 @@ public class StagingArea implements Serializable {
         File f = new File(filePath);
         Blob blob = new Blob(f);
 
+        /* If the current working version of the file is identical to the version in the current commit, do not stage it to be added,
+           and remove it from the staging area if it is already there (as can happen when a file is changed, added, and then changed back to it’s original version).
+         */
+
+        // Fetch the previous commit and update the current commit parent and branch
+        String branch = Utils.readContentsAsString(Repository.HEAD);
+        File path = Utils.join(Repository.BRANCH, branch);
+        String commitHash = Utils.readContentsAsString(path);
+        path = Utils.join(Repository.COMMITS, commitHash);
+        Commit commit = Utils.readObject(path, Commit.class);
+
+        // Getting tree
+        if (commit.getTree() != null) {
+            path = Utils.join(Repository.TREES, commit.getTree());
+            Tree tree = Utils.readObject(path, Tree.class);
+            if (tree.getTree().containsKey(filePath)) {
+                if (tree.getTree().get(filePath).getHash().equals(blob.getHash())) {
+                    if (!this.iscleared()) {
+                        this.removeFile(filePath);
+                    }
+                    return;
+                }
+            }
+        }
+
         // If file is not staged, push it to staging area
         if (!this.stage.containsKey(filePath))
         {

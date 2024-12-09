@@ -18,7 +18,6 @@ public class Tree implements Serializable {
     public void addBlob(String path, TreeEntry blob)
     {
         if (this.blobs.containsKey(path)) {
-            System.out.println("Previous size: " + this.treeSize);
             this.treeSize -= this.blobs.get(path).getSize();
         }
 
