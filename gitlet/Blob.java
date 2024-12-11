@@ -8,6 +8,12 @@ public class Blob implements Serializable {
     private String hash;
     private String content;
 
+    public Blob() {
+        this.content = "";
+        String sha = "Blob " + this.content.length() + "\0" + this.content;
+        this.hash = Utils.sha1(sha);
+    }
+
     public Blob(File path) throws IllegalArgumentException
     {
         this.content = new String( Utils.readContents(path), StandardCharsets.UTF_8);

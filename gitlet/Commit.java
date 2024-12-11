@@ -35,6 +35,8 @@ public class Commit implements Serializable {
     private String timeStamp;
     /** The tree structure of this Commit. */
     private String tree;
+    /** The SHA of this Commit. */
+    private String SHA;
 
     private String setDefaultTimeStamp()
     {
@@ -120,6 +122,17 @@ public class Commit implements Serializable {
         return this.parent;
     }
 
+    public void setSecParent(String secParent)
+    {
+        this.secParent = secParent;
+    }
+
+    public String getSecParent()
+    {
+        return this.secParent;
+    }
+
+
     public void setTimeStamp(String timeStamp)
     {
         this.timeStamp = timeStamp;
@@ -155,9 +168,14 @@ public class Commit implements Serializable {
         if (this.secParent != null) {
             commitContent.append("Second parent ").append(this.secParent).append("\n");
         }
-        commitContent.append("TimeStamp ").append(this.timeStamp).append(" +0000").append("\n");
+        commitContent.append("TimeStamp ").append(this.timeStamp).append("\n");
         commitContent.append(this.message).append("\n");
-        return Utils.sha1(commitContent.toString());
+        this.SHA = Utils.sha1(commitContent.toString());
+        return this.SHA;
+    }
+
+    public String getSHA() {
+        return this.SHA;
     }
 
 }

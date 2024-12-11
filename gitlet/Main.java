@@ -1,5 +1,8 @@
 package gitlet;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /** Driver class for Gitlet, a subset of the Git version-control system.
  *  @author Abdelrahman Ezz
  */
@@ -128,6 +131,7 @@ public class Main {
 
             default:
                 Utils.message("No command with that name exists.");
+
         }
     }
 }

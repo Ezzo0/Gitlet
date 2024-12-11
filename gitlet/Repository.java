@@ -1,6 +1,9 @@
 package gitlet;
 
+import jdk.jshell.execution.Util;
+
 import java.io.File;
+import java.rmi.server.UID;
 import java.util.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -33,6 +36,7 @@ public class Repository {
     /** The head pointer file */
     public static final File BRANCH = Utils.join(GITLET_DIR, "branches");
     private static StagingArea st;
+    private static boolean conflict = false;
 
 
     public Repository() {}
@@ -329,6 +333,9 @@ public class Repository {
                 while (true)
                 {
                     System.out.println("Commit " + SHA);
+                    if (currentCommit.getSecParent() != null)
+                        System.out.println("Merge: " + currentCommit.getParent().substring(0,7) + " " + currentCommit.getSecParent().substring(0,7));
+
                     System.out.println("Date: " + currentCommit.getTimeStamp());
                     Utils.message(currentCommit.getMessage());
                     System.out.println();
@@ -576,6 +583,126 @@ public class Repository {
         System.out.println();
     }
 
+    private static void checkoutCommitID(String id, String name) {
+        String commitID = id;
+        String fileName = name;
+        try {
+            File commitSHA = Utils.join(COMMITS, commitID);
+            Commit c;
+            try {
+                c = Utils.readObject(commitSHA, Commit.class);
+            } catch (IllegalArgumentException e) {
+                Utils.message("No commit with that id exists");
+                return;
+            }
+            String commitTree = c.getTree();
+            Tree tree = null;
+            if (commitTree != null) {
+                File treeSHA = Utils.join(TREES, commitTree);
+                tree = Utils.readObject(treeSHA, Tree.class);
+            } else {
+                tree = new Tree();
+            }
+            if (tree.getTree().containsKey(fileName)) {
+                // Remove the file from staging area if it is staged
+                st = Utils.readObject(INDEX, StagingArea.class);
+                if (!st.iscleared())
+                    st.removeFile(fileName);
+
+                // Fetching the content
+                String blobHash = tree.getTree().get(fileName).getHash();
+                File f = Utils.join(BLOBS, blobHash);
+                Blob blob = Utils.readObject(f, Blob.class);
+                String content = blob.getContent();
+
+                // Overwriting content
+                try {
+                    File path = Utils.join(CWD, fileName);
+                    Utils.writeContents(path, content);
+                } catch (IllegalArgumentException e) {
+                    Utils.message("Unknown Error!!!");
+                }
+
+            } else {
+                Utils.message("File does not exist in that commit.");
+            }
+        } catch (Exception e) {
+            Utils.message("File does not exist in that commit.");
+        }
+    }
+
+    private static void checkoutBranch(String b) {
+        String branch = b;
+        String currentBranch = Utils.readContentsAsString(HEAD);
+        if (branch.equals(currentBranch)) {
+            Utils.message("No need to checkout the current branch.");
+            return;
+        }
+        File head = Utils.join(BRANCH, branch);
+        String previousCommit = null;
+        try {
+            previousCommit = Utils.readContentsAsString(head);
+        } catch (IllegalArgumentException e) {
+            Utils.message("No such branch exists.");
+            return;
+        }
+        File commitSHA = Utils.join(COMMITS, previousCommit);
+        Commit c = Utils.readObject(commitSHA, Commit.class);
+        String commitTree = c.getTree();
+        Tree tree = null;
+        if (commitTree != null) {
+            File treeSHA = Utils.join(TREES, commitTree);
+            tree = Utils.readObject(treeSHA, Tree.class);
+        } else {
+            tree = new Tree();
+        }
+
+        List<String> l = Utils.plainFilenamesIn(CWD);
+
+        Map<String, String> untracked = Tracked();
+        for (String file: l) {
+            // Checking the existence of untracked files
+            if (untracked.containsKey(file) && untracked.get(file).equals("Untracked") ) {
+                Utils.message("There is an untracked file in the way; delete it, or add and commit it first.");
+                return;
+            }
+        }
+
+
+        // Deleting tracked files that are not in checked-out branch tree
+        for (String file: l) {
+            if (!tree.getTree().containsKey(file)) {
+                Utils.restrictedDelete(file);
+            }
+        }
+
+        for (HashMap.Entry<String, TreeEntry> entry : tree.getTree().entrySet()) {
+            if (entry.getValue() != null) {
+                try {
+                    // Fetching the content
+                    String blobHash = entry.getValue().getHash();
+                    File f = Utils.join(BLOBS, blobHash);
+                    Blob blob = Utils.readObject(f, Blob.class);
+                    String content = blob.getContent();
+
+                    // Overwriting the content
+                    f = Utils.join(CWD, entry.getKey());
+                    Utils.writeContents(f, content);
+
+                } catch (IllegalArgumentException e) {
+                    Utils.message("Unknown Error !!!");
+                }
+            }
+        }
+
+        // Changing the current branch (HEAD) to the given branch.
+        Utils.writeContents(HEAD, branch);
+
+        // Clearing Staging Area
+        st = Utils.readObject(INDEX, StagingArea.class);
+        st.clearStage();
+        Utils.writeObject(INDEX, st);
+    }
 
     public static void checkout(String[] args) {
         // Check the existence of .gitlet Directory
@@ -634,124 +761,11 @@ public class Repository {
             }
         } else if (args.length == 4) {
             /* java gitlet.Main checkout [commit id] -- [file name] */
-            String commitID = args[1];
-            String fileName = args[3];
-            try {
-                File commitSHA = Utils.join(COMMITS, commitID);
-                Commit c;
-                try {
-                    c = Utils.readObject(commitSHA, Commit.class);
-                } catch (IllegalArgumentException e) {
-                    Utils.message("No commit with that id exists");
-                    return;
-                }
-                String commitTree = c.getTree();
-                Tree tree = null;
-                if (commitTree != null) {
-                    File treeSHA = Utils.join(TREES, commitTree);
-                    tree = Utils.readObject(treeSHA, Tree.class);
-                } else {
-                    tree = new Tree();
-                }
-                if (tree.getTree().containsKey(fileName)) {
-                    // Remove the file from staging area if it is staged
-                    st = Utils.readObject(INDEX, StagingArea.class);
-                    if (!st.iscleared())
-                        st.removeFile(fileName);
-
-                    // Fetching the content
-                    String blobHash = tree.getTree().get(fileName).getHash();
-                    File f = Utils.join(BLOBS, blobHash);
-                    Blob blob = Utils.readObject(f, Blob.class);
-                    String content = blob.getContent();
-
-                    // Overwriting content
-                    try {
-                        File path = Utils.join(CWD, fileName);
-                        Utils.writeContents(path, content);
-                    } catch (IllegalArgumentException e) {
-                        Utils.message("Unknown Error!!!");
-                    }
-
-                } else {
-                    Utils.message("File does not exist in that commit.");
-                }
-            } catch (Exception e) {
-                Utils.message("File does not exist in that commit.");
-            }
+            checkoutCommitID(args[1], args[3]);
 
         } else {
             /* java gitlet.Main checkout [branch name] */
-            String branch = args[1];
-            String currentBranch = Utils.readContentsAsString(HEAD);
-            if (branch.equals(currentBranch)) {
-                Utils.message("No need to checkout the current branch.");
-                return;
-            }
-            File head = Utils.join(BRANCH, branch);
-            String previousCommit = null;
-            try {
-                previousCommit = Utils.readContentsAsString(head);
-            } catch (IllegalArgumentException e) {
-                Utils.message("No such branch exists.");
-                return;
-            }
-            File commitSHA = Utils.join(COMMITS, previousCommit);
-            Commit c = Utils.readObject(commitSHA, Commit.class);
-            String commitTree = c.getTree();
-            Tree tree = null;
-            if (commitTree != null) {
-                File treeSHA = Utils.join(TREES, commitTree);
-                tree = Utils.readObject(treeSHA, Tree.class);
-            } else {
-                tree = new Tree();
-            }
-
-            List<String> l = Utils.plainFilenamesIn(CWD);
-
-            Map<String, String> untracked = Tracked();
-            for (String file: l) {
-                // Checking the existence of untracked files
-                if (untracked.containsKey(file) && untracked.get(file).equals("Untracked") ) {
-                    Utils.message("There is an untracked file in the way; delete it, or add and commit it first.");
-                    return;
-                }
-            }
-
-
-            // Deleting tracked files that are not in checked-out branch tree
-            for (String file: l) {
-                if (!tree.getTree().containsKey(file)) {
-                    Utils.restrictedDelete(file);
-                }
-            }
-
-            for (HashMap.Entry<String, TreeEntry> entry : tree.getTree().entrySet()) {
-                if (entry.getValue() != null) {
-                    try {
-                        // Fetching the content
-                        String blobHash = entry.getValue().getHash();
-                        File f = Utils.join(BLOBS, blobHash);
-                        Blob blob = Utils.readObject(f, Blob.class);
-                        String content = blob.getContent();
-
-                        // Overwriting the content
-                        f = Utils.join(CWD, entry.getKey());
-                        Utils.writeContents(f, content);
-
-                    } catch (IllegalArgumentException e) {
-                        Utils.message("Unknown Error !!!");
-                    }
-                }
-            }
-
-            // Changing the current branch (HEAD) to the given branch.
-            Utils.writeContents(HEAD, branch);
-
-            // Clearing Staging Area
-            st = Utils.readObject(INDEX, StagingArea.class);
-            st.clearStage();
-            Utils.writeObject(INDEX, st);
+            checkoutBranch(args[1]);
         }
     }
 
@@ -866,7 +880,346 @@ public class Repository {
         st.clearStage();
         Utils.writeObject(INDEX, st);
     }
+
+    public static Commit findMergeBase(Commit inComingBranch, Commit currentBranch) {
+        // Visited sets for both branches
+        Set<String> visitedBranch1 = new HashSet<>();
+        Set<String> visitedBranch2 = new HashSet<>();
+
+        // Queues for BFS
+        Queue<Commit> queue1 = new LinkedList<>();
+        Queue<Commit> queue2 = new LinkedList<>();
+
+        queue1.add(inComingBranch);
+        queue2.add(currentBranch);
+
+        File path;
+        Commit parent;
+        // Perform BFS for both branches
+        while (!queue1.isEmpty() || !queue2.isEmpty()) {
+            // Process inComingBranch
+            if (!queue1.isEmpty()) {
+                Commit current1 = queue1.poll();
+                if (visitedBranch2.contains(current1.getSHA()))
+                    return current1; // Found common ancestor
+
+                visitedBranch1.add(current1.getSHA());
+                if (current1.getParent() != null) {
+                    path = Utils.join(COMMITS, current1.getParent());
+                    parent = Utils.readObject(path, Commit.class);
+                    queue1.add(parent);
+                }
+                if (current1.getSecParent() != null) {
+                    path = Utils.join(COMMITS, current1.getSecParent());
+                    parent = Utils.readObject(path, Commit.class);
+                    queue1.add(parent);
+                }
+            }
+
+            // Process currentBranch
+            if (!queue2.isEmpty()) {
+                Commit current2 = queue2.poll();
+                if (visitedBranch1.contains(current2.getSHA()))
+                    return current2; // Found common ancestor
+
+                visitedBranch2.add(current2.getSHA());
+                if (current2.getParent() != null) {
+                    path = Utils.join(COMMITS, current2.getParent());
+                    parent = Utils.readObject(path, Commit.class);
+                    queue2.add(parent);
+                }
+                if (current2.getSecParent() != null) {
+                    path = Utils.join(COMMITS, current2.getSecParent());
+                    parent = Utils.readObject(path, Commit.class);
+                    queue2.add(parent);
+                }
+            }
+        }
+
+        return null; // No common ancestor found
+    }
+
+    private static String handleConflict(String name, TreeEntry currentEntry, TreeEntry inComingEntry) {
+        File path;
+        Blob current, inComing;
+        if (currentEntry != null) {
+            path = Utils.join(BLOBS, currentEntry.getHash());
+            current = Utils.readObject(path, Blob.class);
+        } else {
+            current = new Blob();
+        }
+
+        if (inComingEntry != null) {
+            path = Utils.join(BLOBS, inComingEntry.getHash());
+            inComing = Utils.readObject(path, Blob.class);
+        } else {
+            inComing = new Blob();
+        }
+
+        String currentContents = current.getContent();
+        String givenContents = inComing.getContent();
+
+        conflict = true;
+
+        // Construct conflict content
+        return "<<<<<<< HEAD\n" + currentContents + "=======\n" + givenContents + ">>>>>>>\n";
+    }
+
+    // Perform a three-way diff between trees
+    public static Tree diffTreesWithBase(Commit splitPoint, Commit inComingBranch, Commit currentBranch) {
+        File path;
+        Tree baseTree;
+        if (splitPoint.getTree() != null) {
+            path = Utils.join(TREES, splitPoint.getTree());
+            baseTree = Utils.readObject(path, Tree.class);
+        } else
+            baseTree = new Tree();
+
+        Tree currentTree;
+        if (currentBranch.getTree() != null) {
+            path = Utils.join(TREES, currentBranch.getTree());
+            currentTree = Utils.readObject(path, Tree.class);
+        } else
+            currentTree = new Tree();
+
+        Tree inComingTree;
+        if (inComingBranch.getTree() != null) {
+            path = Utils.join(TREES, inComingBranch.getTree());
+            inComingTree = Utils.readObject(path, Tree.class);
+        } else
+            inComingTree = new Tree();
+
+
+        Tree t = new Tree();
+        // Union of all entries across the three trees
+        Set<String> allEntries = new HashSet<>();
+        allEntries.addAll(baseTree.getEntryNames());
+        allEntries.addAll(inComingTree.getEntryNames());
+        allEntries.addAll(currentTree.getEntryNames());
+
+        for (String name : allEntries) {
+            TreeEntry baseEntry = baseTree.getTree().get(name);
+            TreeEntry inComingEntry = inComingTree.getTree().get(name);
+            TreeEntry currentEntry = currentTree.getTree().get(name);
+
+            if (baseEntry != null) {
+                // File present in split point
+                if (currentEntry != null && inComingEntry != null) {
+                    if ( baseEntry.getHash().equals(currentEntry.getHash()) && !baseEntry.getHash().equals(inComingEntry.getHash()) ) {
+                        // Case 1: Modified in the incoming branch since the split point, but not modified in the current branch
+                        checkoutCommitID(inComingBranch.getSHA(), name);
+                        t.addBlob(name, inComingEntry);
+                        try {
+                            st = Utils.readObject(INDEX, StagingArea.class);
+                        } catch (IllegalArgumentException e) {
+                            st = new StagingArea();
+                        }
+                        if (st.iscleared()) {
+                            st = new StagingArea();
+                        }
+                        st.addFile(name);
+                        Utils.writeObject(INDEX, st);
+                    } else if ( !baseEntry.getHash().equals(currentEntry.getHash()) && baseEntry.getHash().equals(inComingEntry.getHash()) ) {
+                        // Case 2: Modified in the current branch but not in the given branch since the split point
+                        // Do nothing
+                        t.addBlob(name, currentEntry);
+                    } else if ( currentEntry.getHash().equals(inComingEntry.getHash()) ) {
+                        // Case 3: Modified in both the current and given branch in the same way (have the same content)
+                        // Do nothing
+                        t.addBlob(name, currentEntry);
+                    } else {
+                        // Case 8: Modified in different ways in the current and given branches (contents of both are changed and different from other)
+                        String conf = handleConflict(name, currentEntry, inComingEntry);
+                        path = Utils.join(CWD, name);
+                        Utils.writeContents(path, conf);
+                        Blob b = new Blob(path);
+                        path = Utils.join(COMMITS, b.getHash());
+                        Utils.writeObject(path, b);
+                        TreeEntry e = new TreeEntry(name, b.getHash());
+                        t.addBlob(name, e);
+                    }
+                } else if (currentEntry != null && inComingEntry == null) {
+                    if (baseEntry.getHash().equals(currentEntry.getHash())) {
+                        // Case 6: Unmodified in the current branch, and absent in the incoming branch
+                        Repository.rm(name);
+                    } else {
+                        // Case 8: The contents of one are changed and the other file is deleted
+                        String conf = handleConflict(name, currentEntry, inComingEntry);
+                        path = Utils.join(CWD, name);
+                        Utils.writeContents(path, conf);
+                        Blob b = new Blob(path);
+                        path = Utils.join(COMMITS, b.getHash());
+                        Utils.writeObject(path, b);
+                        TreeEntry e = new TreeEntry(name, b.getHash());
+                        t.addBlob(name, e);
+                    }
+                } else if (currentEntry == null && inComingEntry != null) {
+                    if (baseEntry.getHash().equals(inComingEntry.getHash())) {
+                        // Case 7: Unmodified in the incoming branch, and absent in the current branch
+                        // Do nothing
+                    } else {
+                        // Case 8: The contents of one are changed and the other file is deleted
+                        String conf = handleConflict(name, currentEntry, inComingEntry);
+                        path = Utils.join(CWD, name);
+                        Utils.writeContents(path, conf);
+                        Blob b = new Blob(path);
+                        path = Utils.join(COMMITS, b.getHash());
+                        Utils.writeObject(path, b);
+                        TreeEntry e = new TreeEntry(name, b.getHash());
+                        t.addBlob(name, e);
+                    }
+                } else {
+                    // Case 3: Modified in both the current and given branch in the same way (both removed)
+                    // Do nothing
+                }
+            } else {
+                // File not present in split point
+                if (currentEntry != null && inComingEntry != null) {
+                    // Case 8: The contents of one are changed and the other file is deleted
+                    String conf = handleConflict(name, currentEntry, inComingEntry);
+                    path = Utils.join(CWD, name);
+                    Utils.writeContents(path, conf);
+                    Blob b = new Blob(path);
+                    path = Utils.join(COMMITS, b.getHash());
+                    Utils.writeObject(path, b);
+                    TreeEntry e = new TreeEntry(name, b.getHash());
+                    t.addBlob(name, e);
+                } else if (currentEntry != null && inComingEntry == null) {
+                    // Case 4: Present only in the current branch
+                    // Do nothing
+                    t.addBlob(name, currentEntry);
+                } else if (currentEntry == null && inComingEntry != null) {
+                    // Case 5: Present only in the incoming branch
+                    checkoutCommitID(inComingBranch.getSHA(), name);
+                    t.addBlob(name, inComingEntry);
+                    try {
+                        st = Utils.readObject(INDEX, StagingArea.class);
+                    } catch (IllegalArgumentException e) {
+                        st = new StagingArea();
+                    }
+                    if (st.iscleared()) {
+                        st = new StagingArea();
+                    }
+                    st.addFile(name);
+                    Utils.writeObject(INDEX, st);
+                }
+            }
+        }
+        return t;
+    }
+
     public static void merge(String branch) {
+        // Check the existence of .gitlet Directory
+        if (!initializedGitlet())
+            return;
+
+        String currentHead = Utils.readContentsAsString(HEAD);
+        if (currentHead.equals(branch)) {
+            Utils.message("Cannot merge a branch with itself.");
+            return;
+        }
+
+        List<String> l = Utils.plainFilenamesIn(CWD);
+        try {
+            st = Utils.readObject(INDEX, StagingArea.class);
+        } catch (IllegalArgumentException e) {
+            st = new StagingArea();
+        }
+
+        Map<String, String> untracked = Tracked();
+        for (String file: l) {
+            // Checking the existence of untracked files
+            if (untracked.containsKey(file) && untracked.get(file).equals("Untracked") ) {
+                Utils.message("There is an untracked file in the way; delete it, or add and commit it first.");
+                return;
+            }
+            // Checking the existence of staged additions or removals
+            if ( ( !st.iscleared() && st.getStagedFiles().containsKey(file) )
+                    || (untracked.containsKey(file) ) ) {
+                Utils.message("You have uncommitted changes.");
+                return;
+            }
+        }
+
+        File path = Utils.join(BRANCH, branch);
+        String commitSHA;
+        Commit inComingBranch;
+
+        // Fetching the incoming branch
+        try {
+            commitSHA = Utils.readContentsAsString(path);
+            path = Utils.join(COMMITS, commitSHA);
+            inComingBranch = Utils.readObject(path, Commit.class);
+        } catch (IllegalArgumentException e) {
+            Utils.message("A branch with that name does not exist.");
+            return;
+        }
+
+        // Fetching the current branch
+        path = Utils.join(BRANCH, currentHead);
+        commitSHA = Utils.readContentsAsString(path);
+        path = Utils.join(COMMITS, commitSHA);
+        Commit currentBranch = Utils.readObject(path, Commit.class);
+
+        // If the merge results in no new changes (because the branches are already identical or equivalent)
+        if (currentBranch.getSHA().equals(inComingBranch.getSHA())) {
+            Utils.message("No changes added to the commit.");
+            return;
+        }
+
+        Commit splitPoint = findMergeBase(inComingBranch, currentBranch);
+        // If the split point is the same commit as the incoming branch, then we do nothing; the merge is completed.
+        if (splitPoint.getSHA().equals(inComingBranch.getSHA())) {
+            Utils.message("Given branch is an ancestor of the current branch.");
+            return;
+        }
+        // If the split point is the current branch
+        if (splitPoint.getSHA().equals(currentBranch.getSHA())) {
+            checkoutBranch(branch);
+            Utils.message("Current branch fast-forwarded.");
+            return;
+        }
+
+        // Getting new tree
+        Tree commitTree = diffTreesWithBase(splitPoint, inComingBranch, currentBranch);
+        if (conflict) {
+            Utils.message("Encountered a merge conflict.");
+            conflict = false;
+        }
+        String SHA = commitTree.hashTreeObject();
+
+        // Writing new tree object
+        path = Utils.join(TREES, SHA);
+        Utils.writeObject(path, commitTree);
+
+        // Commiting Merge
+        String message = "Merged " + inComingBranch.getBranch() + "into "  + currentBranch.getBranch() + ".";
+        Commit commit = new Commit(message);
+        commit.setParent(currentBranch.getSHA());
+        commit.setSecParent(inComingBranch.getSHA());
+        commit.setBranch(currentBranch.getBranch());
+        commit.setTree(SHA);
+
+        // Get the current date and time
+        Date now = new Date();
+        // Create a formatter for the desired format
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z");
+
+        // Set the formatter to use the system's default timezone
+        sdf.setTimeZone(TimeZone.getDefault());
+        // Format the current date and time and update Commit Timestamp
+        commit.setTimeStamp(sdf.format(now));
+
+        SHA = commit.hashCommitObject();
+        path = Utils.join(COMMITS, SHA);
+        Utils.writeObject(path, commit);
+
+        // Updating head and branch files
+        File branchFile = Utils.join(BRANCH, commit.getBranch());
+        Utils.writeContents(branchFile, SHA);
+
+        // Clear Staging Area
+        st.clearStage();
 
     }
 }

@@ -2,6 +2,7 @@ package gitlet;
 
 import java.io.Serializable;
 import java.util.HashMap;
+import java.util.Set;
 
 public class Tree implements Serializable {
 
@@ -59,5 +60,9 @@ public class Tree implements Serializable {
     public String getHash()
     {
         return this.hash;
+    }
+
+    public Set<String> getEntryNames() {
+        return this.blobs.keySet();
     }
 }
