@@ -1,4 +1,4 @@
-Gitlet is a version control system inspired from [git](https://git-scm.com/) that was implemented in java.
+Gitlet is a version control system, inspired from [git](https://git-scm.com/), that was implemented in java.
 ## Internal Structure
 Real Git distinguishes several different kinds of objects. For our purposes, the important ones are
 
